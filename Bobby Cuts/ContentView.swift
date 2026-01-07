@@ -1,24 +1,19 @@
-//
-//  ContentView.swift
-//  Bobby Cuts
-//
-//  Created by Havish on 10/6/25.
-//
-
 import SwiftUI
 
 struct ContentView: View {
+    @EnvironmentObject var viewModel: BookingViewModel
+    
     var body: some View {
-        VStack {
-            Image(systemName: "globe")
-                .imageScale(.large)
-                .foregroundStyle(.tint)
-            Text("Hello, world!")
+        NavigationView {
+            HomeView()
         }
-        .padding()
+        .navigationViewStyle(StackNavigationViewStyle())
     }
 }
 
-#Preview {
-    ContentView()
+struct ContentView_Previews: PreviewProvider {
+    static var previews: some View {
+        ContentView()
+            .environmentObject(BookingViewModel())
+    }
 }
