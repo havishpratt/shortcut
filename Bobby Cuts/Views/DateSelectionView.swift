@@ -61,3 +61,12 @@ struct DateCard: View {
         }
     }
 }
+
+struct DateSelectionView_Previews: PreviewProvider {
+    static var previews: some View {
+        NavigationView {
+            DateSelectionView()
+                .environmentObject(BookingViewModel())
+        }
+    }
+}

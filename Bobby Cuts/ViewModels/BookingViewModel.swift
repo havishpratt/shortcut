@@ -4,46 +4,25 @@ import Combine
 class BookingViewModel: ObservableObject {
     @Published var bookedSlots: [String: Bool] = [:]
     @Published var currentBooking: Booking?
-    @Published var weeklySchedule: [WeeklySchedule] = []
-    @Published var settings: BarberSettings?
-    @Published var isLoading = false
+    @Published var statusMessage: String = ""
+    @Published var isProcessing: Bool = false
     
+    // Default Schedule (Fallback until we load from DB)
+    let businessDays: Set<Int> = [3, 4, 5, 6, 7] // Tue-Sat
+    let businessHours = Array(16...19) // 4pm-8pm
     let bookingWindowDays = 14
+    
     private let service = BookingService.shared
-    
-    init() {
-        Task {
-            await loadData()
-        }
-    }
-    
-    @MainActor
-    func loadData() async {
-        isLoading = true
-        do {
-            async let schedule = service.fetchWeeklySchedule()
-            async let fetchedSettings = service.fetchSettings()
-            
-            self.weeklySchedule = try await schedule
-            self.settings = try await fetchedSettings
-        } catch {
-            print("Error loading data: \(error)")
-        }
-        isLoading = false
-    }
     
     func getAvailableDates() -> [Date] {
         var dates: [Date] = []
         let calendar = Calendar.current
         let today = Date()
         
-        // Map of Day Int (1=Sun) to Schedule
-        let scheduleMap = Dictionary(uniqueKeysWithValues: weeklySchedule.map { ($0.dayOfWeek, $0) })
-        
         for i in 0..<bookingWindowDays {
             if let date = calendar.date(byAdding: .day, value: i, to: today) {
                 let weekday = calendar.component(.weekday, from: date)
-                if let schedule = scheduleMap[weekday], schedule.isActive {
+                if businessDays.contains(weekday) {
                     dates.append(date)
                 }
             }
@@ -54,13 +33,6 @@ class BookingViewModel: ObservableObject {
     func getAvailableSlots(for date: Date) -> [TimeSlot] {
         let calendar = Calendar.current
         let now = Date()
-        let weekday = calendar.component(.weekday, from: date)
-        
-        guard let schedule = weeklySchedule.first(where: { $0.dayOfWeek == weekday }), schedule.isActive else {
-            return []
-        }
-        
-        let businessHours = Array(schedule.startHour..<schedule.endHour)
         
         return businessHours.compactMap { hour in
             var components = calendar.dateComponents([.year, .month, .day], from: date)
@@ -90,8 +62,7 @@ class BookingViewModel: ObservableObject {
     
     func bookSlot(date: Date, hour: Int, name: String, phone: String, email: String) {
         let key = slotKey(date: date, hour: hour)
-        // Optimistic update
-        bookedSlots[key] = true
+        isProcessing = true
         
         var components = Calendar.current.dateComponents([.year, .month, .day], from: date)
         components.hour = hour
@@ -106,16 +77,31 @@ class BookingViewModel: ObservableObject {
             status: .pending
         )
         
+        // Optimistic UI Update
+        bookedSlots[key] = true
         currentBooking = newBooking
         
+        // DEBUG: Check Timezone
+        print("🕒 Booking Time Debug:")
+        print("   You selected Hour: \(hour)")
+        print("   Local Device Time: \(bookingDate.description(with: .current))")
+        print("   UTC Time (sent to DB): \(bookingDate)")
+        
+        // Send to Supabase
         Task {
             do {
-                try await service.createBooking(booking: newBooking)
+                try await service.submitBooking(booking: newBooking)
+                await MainActor.run {
+                    self.statusMessage = "Booking Sent to Database!"
+                    self.isProcessing = false
+                }
             } catch {
-                print("Failed to create booking: \(error)")
-                // Revert state if error
-                DispatchQueue.main.async {
+                await MainActor.run {
+                    self.statusMessage = "Error: \(error.localizedDescription)"
+                    self.isProcessing = false
+                    // Revert if failed
                     self.bookedSlots[key] = false
+                    self.currentBooking = nil
                 }
             }
         }

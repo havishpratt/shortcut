@@ -29,6 +29,16 @@ struct BookingConfirmationView: View {
                     .multilineTextAlignment(.center)
                     .padding(.horizontal)
                 
+                // Debug Message (If Any)
+                if !viewModel.statusMessage.isEmpty {
+                    Text(viewModel.statusMessage)
+                        .font(.caption)
+                        .foregroundColor(.blue)
+                        .padding()
+                        .background(Color.blue.opacity(0.1))
+                        .cornerRadius(8)
+                }
+                
                 // Booking Details
                 VStack(alignment: .leading, spacing: 16) {
                     DetailRow(icon: "person.fill", label: "Name", value: booking.customerName)
@@ -103,7 +113,24 @@ struct DetailRow: View {
                     .foregroundColor(.secondary)
                 Text(value)
                     .font(.body)
+                        }
+                    }
+                }
             }
-        }
-    }
-}
+            
+            struct BookingConfirmationView_Previews: PreviewProvider {
+                static var previews: some View {
+                    let dummyBooking = Booking(
+                        id: UUID(),
+                        date: Date(),
+                        customerName: "Test User",
+                        customerPhone: "123-456-7890",
+                        customerEmail: "test@example.com",
+                        status: .pending
+                    )
+                    
+                    BookingConfirmationView(booking: dummyBooking)
+                        .environmentObject(BookingViewModel())
+                }
+            }
+            

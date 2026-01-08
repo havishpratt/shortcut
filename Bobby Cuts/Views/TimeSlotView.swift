@@ -47,3 +47,12 @@ struct TimeSlotView: View {
         .navigationBarTitleDisplayMode(.inline)
     }
 }
+
+struct TimeSlotView_Previews: PreviewProvider {
+    static var previews: some View {
+        NavigationView {
+            TimeSlotView(date: Date())
+                .environmentObject(BookingViewModel())
+        }
+    }
+}

@@ -8,7 +8,6 @@ struct BookingFormView: View {
     @State private var name = ""
     @State private var phone = ""
     @State private var email = ""
-    @State private var isProcessing = false
     
     var isFormValid: Bool {
         !name.isEmpty && !phone.isEmpty && !email.isEmpty && email.contains("@")
@@ -88,10 +87,18 @@ struct BookingFormView: View {
                 
                 // Book Button
                 Button(action: {
-                    submitBooking()
+                    viewModel.bookSlot(
+                        date: slot.date,
+                        hour: slot.hour,
+                        name: name,
+                        phone: phone,
+                        email: email
+                    )
+                    // We dismiss immediately for better UX, viewModel handles background task
+                    dismiss()
                 }) {
                     HStack {
-                        if isProcessing {
+                        if viewModel.isProcessing {
                             ProgressView()
                                 .progressViewStyle(CircularProgressViewStyle(tint: .white))
                         } else {
@@ -105,31 +112,21 @@ struct BookingFormView: View {
                     .foregroundColor(.white)
                     .cornerRadius(12)
                 }
-                .disabled(!isFormValid || isProcessing)
+                .disabled(!isFormValid || viewModel.isProcessing)
             }
             .padding()
         }
         .navigationTitle("Complete Booking")
         .navigationBarTitleDisplayMode(.inline)
     }
-    
-    func submitBooking() {
-        isProcessing = true
-        
-        // Simulate network delay
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
-            viewModel.bookSlot(
-                date: slot.date,
-                hour: slot.hour,
-                name: name,
-                phone: phone,
-                email: email
-            )
-            
-            isProcessing = false
-            
-            // Navigate back to root
-            dismiss()
+}
+
+struct BookingFormView_Previews: PreviewProvider {
+    static var previews: some View {
+        let dummySlot = TimeSlot(date: Date(), hour: 12)
+        NavigationView {
+            BookingFormView(slot: dummySlot)
+                .environmentObject(BookingViewModel())
         }
     }
 }
