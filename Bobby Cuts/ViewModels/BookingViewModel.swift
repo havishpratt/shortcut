@@ -6,8 +6,11 @@ class BookingViewModel: ObservableObject {
     @Published var currentBooking: Booking?
     @Published var statusMessage: String = ""
     @Published var isProcessing: Bool = false
-    @Published var occupiedHours: Set<Int> = [] // Hours that are already taken on the selected date
     @Published var isLoadingSlots: Bool = false
+    @Published var isInitialLoading: Bool = true // For app-wide loading state
+    
+    // Preloaded bookings: key is "yyyy-MM-dd", value is set of occupied hours
+    @Published var allOccupiedSlots: [String: Set<Int>] = [:]
     
     // Default Schedule (Fallback until we load from DB)
     let businessDays: Set<Int> = [1, 2, 3, 4, 5, 6, 7] // All Days
@@ -24,6 +27,53 @@ class BookingViewModel: ObservableObject {
         }
         return cal
     }()
+    
+    private var dateKeyFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        formatter.timeZone = TimeZone(identifier: "America/New_York")
+        return formatter
+    }()
+    
+    init() {
+        // Preload all bookings on init
+        Task {
+            await preloadAllBookings()
+        }
+    }
+    
+    // MARK: - Preload All Bookings
+    
+    @MainActor
+    func preloadAllBookings() async {
+        isInitialLoading = true
+        
+        do {
+            let today = shopCalendar.startOfDay(for: Date())
+            let allBookedDates = try await service.fetchAllBookingsInRange(from: today, days: bookingWindowDays)
+            
+            // Group bookings by date key and extract hours
+            var slotsByDate: [String: Set<Int>] = [:]
+            
+            for bookedDate in allBookedDates {
+                let dateKey = dateKeyFormatter.string(from: bookedDate)
+                let hour = shopCalendar.component(.hour, from: bookedDate)
+                
+                if slotsByDate[dateKey] == nil {
+                    slotsByDate[dateKey] = []
+                }
+                slotsByDate[dateKey]?.insert(hour)
+            }
+            
+            allOccupiedSlots = slotsByDate
+            print("📅 Preloaded \(allBookedDates.count) bookings across \(slotsByDate.keys.count) days")
+            
+        } catch {
+            print("❌ Failed to preload bookings: \(error)")
+        }
+        
+        isInitialLoading = false
+    }
     
     // MARK: - Date Selection
     
@@ -45,35 +95,25 @@ class BookingViewModel: ObservableObject {
     
     // MARK: - Slot Selection
     
-    /// Called when the user taps a date. Fetches real bookings from Supabase.
+    /// Get occupied hours for a specific date from preloaded data
+    func getOccupiedHours(for date: Date) -> Set<Int> {
+        let dateKey = dateKeyFormatter.string(from: date)
+        return allOccupiedSlots[dateKey] ?? []
+    }
+    
+    /// Called when the user taps a date. Now uses preloaded data instead of fetching.
     @MainActor
     func loadAvailability(for date: Date) async {
-        isLoadingSlots = true
-        occupiedHours.removeAll()
-        
-        do {
-            let takenDates = try await service.fetchExistingBookings(for: date)
-            
-            // Extract just the hour from the full dates using Shop Calendar
-            let hours = takenDates.map { shopCalendar.component(.hour, from: $0) }
-            
-            occupiedHours = Set(hours)
-            print("📅 Loaded availability for \(date): Occupied Hours: \(occupiedHours)")
-            
-        } catch {
-            // Ignore cancellation errors (happens when quickly scrolling/navigating)
-            if (error as NSError).code == -999 { return }
-            print("❌ Failed to load availability: \(error)")
-        }
-        
+        // Data is already preloaded, just trigger a refresh if needed
         isLoadingSlots = false
     }
     
     func getAvailableSlots(for date: Date) -> [TimeSlot] {
         let now = Date()
+        let occupiedHours = getOccupiedHours(for: date)
         
         return businessHours.compactMap { hour in
-            // 1. Check if this hour is already taken in the DB
+            // 1. Check if this hour is already taken in the preloaded data
             if occupiedHours.contains(hour) {
                 return nil
             }
@@ -99,11 +139,13 @@ class BookingViewModel: ObservableObject {
         }
     }
     
+    /// Get count of available slots for a date (for display in date cards)
+    func getAvailableSlotsCount(for date: Date) -> Int {
+        return getAvailableSlots(for: date).count
+    }
+    
     func slotKey(date: Date, hour: Int) -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
-        formatter.timeZone = TimeZone(identifier: "America/New_York") // Force formatter to Shop Time
-        return "\(formatter.string(from: date))-\(hour)"
+        return "\(dateKeyFormatter.string(from: date))-\(hour)"
     }
     
     // MARK: - Booking Action
@@ -127,6 +169,14 @@ class BookingViewModel: ObservableObject {
         
         // Optimistic UI Update
         bookedSlots[key] = true
+        
+        // Also update preloaded data
+        let dateKey = dateKeyFormatter.string(from: date)
+        if allOccupiedSlots[dateKey] == nil {
+            allOccupiedSlots[dateKey] = []
+        }
+        allOccupiedSlots[dateKey]?.insert(hour)
+        
         currentBooking = newBooking
         
         // DEBUG: Check Timezone
@@ -148,6 +198,7 @@ class BookingViewModel: ObservableObject {
                     self.isProcessing = false
                     // Revert if failed
                     self.bookedSlots[key] = false
+                    self.allOccupiedSlots[dateKey]?.remove(hour)
                     self.currentBooking = nil
                 }
             }

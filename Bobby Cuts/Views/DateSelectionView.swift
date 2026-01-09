@@ -154,9 +154,10 @@ struct DateCard: View {
                         Text("•")
                             .foregroundColor(AppTheme.textMuted)
                         
-                        Text("4 slots open")
+                        let slotsCount = viewModel.getAvailableSlotsCount(for: date)
+                        Text("\(slotsCount) slot\(slotsCount == 1 ? "" : "s") open")
                             .font(.subheadline)
-                            .foregroundColor(AppTheme.success)
+                            .foregroundColor(slotsCount > 0 ? AppTheme.success : AppTheme.textMuted)
                     }
                 }
                 

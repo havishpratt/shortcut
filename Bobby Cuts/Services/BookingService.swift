@@ -88,10 +88,38 @@ class BookingService {
             .select("date")
             .gte("date", value: formatter.string(from: startOfDay))
             .lt("date", value: formatter.string(from: endOfDay))
-            .in("status", value: ["pending", "confirmed"])
+            .in("status", values: ["pending", "confirmed"])
             .execute()
             .value
             
+        return bookings.map { $0.date }
+    }
+    
+    /// Fetches all bookings for a date range (used for preloading)
+    func fetchAllBookingsInRange(from startDate: Date, days: Int) async throws -> [Date] {
+        var calendar = Calendar.current
+        if let shopTimeZone = TimeZone(identifier: "America/New_York") {
+            calendar.timeZone = shopTimeZone
+        }
+        
+        let startOfRange = calendar.startOfDay(for: startDate)
+        guard let endOfRange = calendar.date(byAdding: .day, value: days, to: startOfRange) else { return [] }
+        
+        let formatter = ISO8601DateFormatter()
+        
+        struct BookingDateOnly: Decodable {
+            let date: Date
+        }
+        
+        let bookings: [BookingDateOnly] = try await supabase
+            .from("bookings")
+            .select("date")
+            .gte("date", value: formatter.string(from: startOfRange))
+            .lt("date", value: formatter.string(from: endOfRange))
+            .in("status", values: ["pending", "confirmed"])
+            .execute()
+            .value
+        
         return bookings.map { $0.date }
     }
 }

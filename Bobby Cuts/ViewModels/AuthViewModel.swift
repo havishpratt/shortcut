@@ -1,6 +1,7 @@
 import SwiftUI
 import AuthenticationServices
 import Combine
+import Supabase
 
 class AuthViewModel: ObservableObject {
     @Published var isAuthenticated = false
@@ -15,6 +16,7 @@ class AuthViewModel: ObservableObject {
     
     enum OnboardingStep {
         case welcome
+        case confirmProfile
         case phoneNumber
     }
     
@@ -58,6 +60,12 @@ class AuthViewModel: ObservableObject {
         phoneNumber.count == 10
     }
     
+    var isProfileValid: Bool {
+        !userName.trimmingCharacters(in: .whitespaces).isEmpty &&
+        !userEmail.trimmingCharacters(in: .whitespaces).isEmpty &&
+        userEmail.contains("@")
+    }
+    
     // MARK: - Apple Sign In
     
     func handleAppleSignIn(result: Result<ASAuthorization, Error>) {
@@ -78,9 +86,9 @@ class AuthViewModel: ObservableObject {
                     userEmail = email
                 }
                 
-                // Move to phone number step
+                // Move to profile confirmation step
                 withAnimation {
-                    currentStep = .phoneNumber
+                    currentStep = .confirmProfile
                 }
             }
             isLoading = false
@@ -91,19 +99,74 @@ class AuthViewModel: ObservableObject {
         }
     }
     
-    // MARK: - Google Sign In (Placeholder)
+    // MARK: - Google Sign In
     
     func handleGoogleSignIn() {
         isLoading = true
         errorMessage = nil
         
-        // TODO: Implement actual Google Sign In
-        // For now, simulate success and move to phone step
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
-            self.isLoading = false
-            withAnimation {
-                self.currentStep = .phoneNumber
+        Task {
+            do {
+                // 1. Generate the URL that starts the Google Login flow
+                let url = try await supabase.auth.getOAuthSignInURL(
+                    provider: .google,
+                    redirectTo: URL(string: "com.prattipati.barbercuts://google-callback")
+                )
+                
+                // 2. Open that URL in Safari
+                await MainActor.run {
+                    UIApplication.shared.open(url)
+                    isLoading = false // We stop loading here because the app will close to open Safari
+                }
+            } catch {
+                await MainActor.run {
+                    self.errorMessage = "Failed to start Google Sign In: \(error.localizedDescription)"
+                    self.isLoading = false
+                }
             }
+        }
+    }
+    
+    // MARK: - Handle Google Callback
+    
+    func handleGoogleCallback(session: Session) {
+        // Extract user info from session
+        if let email = session.user.email {
+            userEmail = email
+        }
+        
+        // Try to get name from user metadata - Google provides various fields
+        let metadata = session.user.userMetadata
+        print("📋 User metadata: \(metadata)")
+        
+        if let fullName = metadata["full_name"]?.stringValue {
+            userName = fullName
+        } else if let name = metadata["name"]?.stringValue {
+            userName = name
+        } else if let givenName = metadata["given_name"]?.stringValue {
+            let familyName = metadata["family_name"]?.stringValue ?? ""
+            userName = "\(givenName) \(familyName)".trimmingCharacters(in: .whitespaces)
+        }
+        
+        print("👤 Extracted - Name: \(userName), Email: \(userEmail)")
+        
+        // Move to profile confirmation step
+        withAnimation {
+            currentStep = .confirmProfile
+        }
+    }
+    
+    // MARK: - Confirm Profile
+    
+    func confirmProfile() {
+        guard isProfileValid else { return }
+        
+        // Save the confirmed profile data
+        UserDefaults.standard.set(userName, forKey: "userName")
+        UserDefaults.standard.set(userEmail, forKey: "userEmail")
+        
+        withAnimation {
+            currentStep = .phoneNumber
         }
     }
     

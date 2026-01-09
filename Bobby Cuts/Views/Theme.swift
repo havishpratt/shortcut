@@ -43,8 +43,7 @@ struct AccentButtonStyle: ButtonStyle {
     
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.headline)
-            .fontWeight(.semibold)
+            .font(.system(size: 17, weight: .semibold))
             .foregroundColor(.white)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 16)
@@ -67,8 +66,7 @@ struct AccentButtonStyle: ButtonStyle {
 struct SecondaryButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.headline)
-            .fontWeight(.medium)
+            .font(.system(size: 17, weight: .medium))
             .foregroundColor(AppTheme.accent)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 16)

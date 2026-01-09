@@ -15,6 +15,12 @@ struct OnboardingView: View {
                         insertion: .move(edge: .trailing).combined(with: .opacity),
                         removal: .move(edge: .leading).combined(with: .opacity)
                     ))
+            case .confirmProfile:
+                ConfirmProfileView()
+                    .transition(.asymmetric(
+                        insertion: .move(edge: .trailing).combined(with: .opacity),
+                        removal: .move(edge: .leading).combined(with: .opacity)
+                    ))
             case .phoneNumber:
                 PhoneNumberView()
                     .transition(.asymmetric(
@@ -142,6 +148,167 @@ struct WelcomeView: View {
     }
 }
 
+// MARK: - Confirm Profile View
+
+struct ConfirmProfileView: View {
+    @EnvironmentObject var authViewModel: AuthViewModel
+    @State private var appeared = false
+    @FocusState private var focusedField: Field?
+    
+    enum Field {
+        case name, email
+    }
+    
+    var body: some View {
+        VStack(spacing: 0) {
+            // Header
+            HStack {
+                Button(action: {
+                    withAnimation {
+                        authViewModel.currentStep = .welcome
+                    }
+                }) {
+                    Image(systemName: "chevron.left")
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundColor(AppTheme.textPrimary)
+                        .frame(width: 44, height: 44)
+                }
+                
+                Spacer()
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, 8)
+            
+            Spacer()
+            
+            // Content
+            VStack(spacing: 32) {
+                // Icon
+                ZStack {
+                    Circle()
+                        .fill(AppTheme.accent.opacity(0.15))
+                        .frame(width: 100, height: 100)
+                    
+                    Image(systemName: "person.crop.circle.fill")
+                        .font(.system(size: 50))
+                        .foregroundColor(AppTheme.accent)
+                }
+                .opacity(appeared ? 1 : 0)
+                .offset(y: appeared ? 0 : 20)
+                
+                // Title
+                VStack(spacing: 8) {
+                    Text("This all look right?")
+                        .font(.title2)
+                        .fontWeight(.bold)
+                        .foregroundColor(AppTheme.textPrimary)
+                    
+                    Text("You can edit your info if needed")
+                        .font(.subheadline)
+                        .foregroundColor(AppTheme.textSecondary)
+                        .multilineTextAlignment(.center)
+                }
+                .opacity(appeared ? 1 : 0)
+                .offset(y: appeared ? 0 : 20)
+                .animation(.spring(response: 0.6, dampingFraction: 0.7).delay(0.1), value: appeared)
+                
+                // Profile Fields
+                VStack(spacing: 16) {
+                    // Name Field
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Name")
+                            .font(.caption)
+                            .fontWeight(.medium)
+                            .foregroundColor(AppTheme.textSecondary)
+                        
+                        HStack(spacing: 12) {
+                            Image(systemName: "person.fill")
+                                .font(.system(size: 16))
+                                .foregroundColor(AppTheme.accent)
+                                .frame(width: 24)
+                            
+                            TextField("", text: $authViewModel.userName, prompt: Text("Your name").foregroundColor(AppTheme.textMuted))
+                                .font(.body)
+                                .foregroundColor(AppTheme.textPrimary)
+                                .focused($focusedField, equals: .name)
+                                .submitLabel(.next)
+                                .onSubmit { focusedField = .email }
+                        }
+                        .padding(16)
+                        .background(AppTheme.backgroundCard)
+                        .cornerRadius(14)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 14)
+                                .stroke(focusedField == .name ? AppTheme.accent : AppTheme.textMuted.opacity(0.2), lineWidth: focusedField == .name ? 2 : 1)
+                        )
+                    }
+                    
+                    // Email Field
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Email")
+                            .font(.caption)
+                            .fontWeight(.medium)
+                            .foregroundColor(AppTheme.textSecondary)
+                        
+                        HStack(spacing: 12) {
+                            Image(systemName: "envelope.fill")
+                                .font(.system(size: 16))
+                                .foregroundColor(AppTheme.accent)
+                                .frame(width: 24)
+                            
+                            TextField("", text: $authViewModel.userEmail, prompt: Text("your@email.com").foregroundColor(AppTheme.textMuted))
+                                .font(.body)
+                                .foregroundColor(AppTheme.textPrimary)
+                                .keyboardType(.emailAddress)
+                                .textInputAutocapitalization(.never)
+                                .autocorrectionDisabled()
+                                .focused($focusedField, equals: .email)
+                                .submitLabel(.done)
+                        }
+                        .padding(16)
+                        .background(AppTheme.backgroundCard)
+                        .cornerRadius(14)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 14)
+                                .stroke(focusedField == .email ? AppTheme.accent : AppTheme.textMuted.opacity(0.2), lineWidth: focusedField == .email ? 2 : 1)
+                        )
+                    }
+                }
+                .padding(.horizontal, 24)
+                .opacity(appeared ? 1 : 0)
+                .offset(y: appeared ? 0 : 20)
+                .animation(.spring(response: 0.6, dampingFraction: 0.7).delay(0.2), value: appeared)
+            }
+            
+            Spacer()
+            
+            // Continue Button
+            Button(action: {
+                authViewModel.confirmProfile()
+            }) {
+                HStack {
+                    Text("Looks Good!")
+                    Image(systemName: "arrow.right")
+                }
+            }
+            .buttonStyle(AccentButtonStyle(isEnabled: authViewModel.isProfileValid))
+            .disabled(!authViewModel.isProfileValid)
+            .padding(.horizontal, 24)
+            .padding(.bottom, 40)
+            .opacity(appeared ? 1 : 0)
+            .animation(.spring(response: 0.6, dampingFraction: 0.7).delay(0.3), value: appeared)
+        }
+        .onAppear {
+            withAnimation {
+                appeared = true
+            }
+        }
+        .onTapGesture {
+            focusedField = nil
+        }
+    }
+}
+
 // MARK: - Phone Number View
 
 struct PhoneNumberView: View {
@@ -223,8 +390,7 @@ struct PhoneNumberView: View {
                             get: { authViewModel.formattedPhoneNumber },
                             set: { authViewModel.formatPhoneNumber($0) }
                         ), prompt: Text("(555) 123-4567").foregroundColor(AppTheme.textMuted))
-                            .font(.title3)
-                            .fontWeight(.medium)
+                            .font(.system(size: 20, weight: .medium))
                             .foregroundColor(AppTheme.textPrimary)
                             .keyboardType(.phonePad)
                             .focused($isPhoneFocused)

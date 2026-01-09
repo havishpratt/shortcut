@@ -25,7 +25,7 @@ struct HomeView: View {
                         .foregroundColor(AppTheme.textSecondary)
                     
                     // Price tag
-                    Text("$15 · 1 Hour")
+                    Text("$20 · 30 minutes")
                         .font(.footnote)
                         .fontWeight(.semibold)
                         .foregroundColor(AppTheme.accent)
@@ -39,7 +39,18 @@ struct HomeView: View {
                 .opacity(headerOpacity)
                 
                 // Main Content
-                if let booking = viewModel.currentBooking {
+                if viewModel.isInitialLoading {
+                    Spacer()
+                    VStack(spacing: 16) {
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle(tint: AppTheme.accent))
+                            .scaleEffect(1.2)
+                        Text("Loading schedule...")
+                            .font(.subheadline)
+                            .foregroundColor(AppTheme.textSecondary)
+                    }
+                    Spacer()
+                } else if let booking = viewModel.currentBooking {
                     BookingConfirmationView(booking: booking)
                 } else {
                     DateSelectionView()

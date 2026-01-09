@@ -2,6 +2,7 @@ import SwiftUI
 
 struct BookingFormView: View {
     @EnvironmentObject var viewModel: BookingViewModel
+    @EnvironmentObject var authViewModel: AuthViewModel
     @Environment(\.dismiss) var dismiss
     let slot: TimeSlot
     
@@ -9,6 +10,7 @@ struct BookingFormView: View {
     @State private var phone = ""
     @State private var email = ""
     @State private var appeared = false
+    @State private var hasLoadedUserData = false
     @FocusState private var focusedField: Field?
     
     enum Field {
@@ -23,6 +25,17 @@ struct BookingFormView: View {
         let formatter = DateFormatter()
         formatter.dateFormat = "EEEE, MMM d"
         return formatter.string(from: slot.date)
+    }
+    
+    var formattedPhone: String {
+        // Format phone for display
+        let digits = phone.filter { $0.isNumber }
+        guard digits.count == 10 else { return phone }
+        
+        let areaCode = digits.prefix(3)
+        let middle = digits.dropFirst(3).prefix(3)
+        let last = digits.dropFirst(6)
+        return "(\(areaCode)) \(middle)-\(last)"
     }
     
     var body: some View {
@@ -40,7 +53,7 @@ struct BookingFormView: View {
                             
                             Spacer()
                             
-                            Text("$15")
+                            Text("$20")
                                 .font(.title3)
                                 .fontWeight(.bold)
                                 .foregroundColor(AppTheme.accent)
@@ -176,6 +189,14 @@ struct BookingFormView: View {
         }
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {
+            // Load saved user data
+            if !hasLoadedUserData {
+                name = authViewModel.userName
+                email = authViewModel.userEmail
+                phone = authViewModel.phoneNumber
+                hasLoadedUserData = true
+            }
+            
             withAnimation(.spring(response: 0.6, dampingFraction: 0.7)) {
                 appeared = true
             }
@@ -216,6 +237,7 @@ struct BookingFormView_Previews: PreviewProvider {
         NavigationView {
             BookingFormView(slot: dummySlot)
                 .environmentObject(BookingViewModel())
+                .environmentObject(AuthViewModel())
         }
     }
 }
