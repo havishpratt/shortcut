@@ -16,11 +16,11 @@ struct HomeView: View {
                     Text("✂️")
                         .font(.system(size: 50))
                     
-                    Text("Bobby Cuts")
+                    Text("Barber Cuts")
                         .font(.system(size: 32, weight: .bold, design: .rounded))
                         .foregroundColor(AppTheme.textPrimary)
                     
-                    Text("Fresh cuts, dorm delivery 🏠")
+                    Text("Premium Grooming Experience")
                         .font(.subheadline)
                         .foregroundColor(AppTheme.textSecondary)
                     
@@ -31,7 +31,7 @@ struct HomeView: View {
                         .foregroundColor(AppTheme.accent)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 6)
-                        .background(AppTheme.accent.opacity(0.1))
+                        .background(AppTheme.accent.opacity(0.15))
                         .cornerRadius(20)
                 }
                 .padding(.top, 20)

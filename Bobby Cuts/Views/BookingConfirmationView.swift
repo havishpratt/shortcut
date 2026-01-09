@@ -26,7 +26,7 @@ struct BookingConfirmationView: View {
                         .fontWeight(.bold)
                         .foregroundColor(AppTheme.textPrimary)
                     
-                    Text("Bobby will confirm your appointment soon")
+                    Text("We'll confirm your appointment soon")
                         .font(.subheadline)
                         .foregroundColor(AppTheme.textSecondary)
                 }
@@ -96,9 +96,9 @@ struct BookingConfirmationView: View {
                         .foregroundColor(AppTheme.textPrimary)
                     
                     VStack(spacing: 12) {
-                        StepRow(number: 1, text: "Bobby checks his schedule")
+                        StepRow(number: 1, text: "We check the schedule")
                         StepRow(number: 2, text: "You get a confirmation email")
-                        StepRow(number: 3, text: "He comes to your dorm!")
+                        StepRow(number: 3, text: "Come through for your cut!")
                     }
                 }
                 .padding(20)

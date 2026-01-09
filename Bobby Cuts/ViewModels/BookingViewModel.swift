@@ -10,7 +10,7 @@ class BookingViewModel: ObservableObject {
     @Published var isLoadingSlots: Bool = false
     
     // Default Schedule (Fallback until we load from DB)
-    let businessDays: Set<Int> = [3, 4, 5, 6, 7] // Tue-Sat
+    let businessDays: Set<Int> = [1, 2, 3, 4, 5, 6, 7] // All Days
     let businessHours = Array(16...19) // 4pm-8pm
     let bookingWindowDays = 14
     

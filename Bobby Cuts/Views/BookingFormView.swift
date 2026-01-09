@@ -130,17 +130,17 @@ struct BookingFormView: View {
                     
                     // Location Note
                     HStack(spacing: 10) {
-                        Image(systemName: "building.2")
+                        Image(systemName: "location.fill")
                             .foregroundColor(AppTheme.accent)
                         
-                        Text("Bobby will come to your dorm!")
+                        Text("You come to us for your cut!")
                             .font(.subheadline)
                             .foregroundColor(AppTheme.textSecondary)
                         
                         Spacer()
                     }
                     .padding(16)
-                    .background(AppTheme.accent.opacity(0.08))
+                    .background(AppTheme.accent.opacity(0.1))
                     .cornerRadius(12)
                     .opacity(appeared ? 1 : 0)
                     

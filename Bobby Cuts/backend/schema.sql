@@ -4,11 +4,11 @@ create extension if not exists "uuid-ossp";
 -- Create Enum for Booking Status
 create type booking_status as enum ('pending', 'confirmed', 'denied');
 
--- 1. Bookings Table (Updated)
+-- 1. Bookings Table
 create table bookings (
   id uuid default uuid_generate_v4() primary key,
   created_at timestamp with time zone default timezone('utc'::text, now()) not null,
-  date timestamp with time zone not null, -- The start time of the appointment
+  date timestamp with time zone not null,
   customer_name text not null,
   customer_phone text not null,
   customer_email text not null,
@@ -18,72 +18,74 @@ create table bookings (
 );
 
 -- 2. Barber Settings (Singleton Table)
--- Stores global configuration like max cuts per day
 create table barber_settings (
-  id int primary key default 1, -- Force single row
+  id int primary key default 1,
   max_cuts_per_day int default 10,
   slot_duration_minutes int default 60,
   auto_approve boolean default false,
   constraint single_row check (id = 1)
 );
-
--- Initialize default settings
 insert into barber_settings (id, max_cuts_per_day) values (1, 10) on conflict do nothing;
 
--- 3. Default Weekly Schedule
--- Stores the recurring availability (e.g., every Tuesday 4pm-8pm)
+-- 3. Weekly Schedule
 create table weekly_schedule (
   id uuid default uuid_generate_v4() primary key,
-  day_of_week int not null, -- 1=Sunday, 2=Monday, ... 7=Saturday
-  start_hour int not null, -- e.g., 16 for 4pm
-  end_hour int not null,   -- e.g., 20 for 8pm
+  day_of_week int not null,
+  start_hour int not null,
+  end_hour int not null,
   is_active boolean default true,
-  
   constraint valid_day check (day_of_week between 1 and 7),
   constraint valid_hours check (start_hour >= 0 and end_hour <= 24 and start_hour < end_hour),
-  unique(day_of_week) -- One rule per day for simplicity (can be expanded)
+  unique(day_of_week)
 );
-
--- Seed Initial Schedule (Tue-Sat, 4pm-8pm) based on previous hardcoded values
 insert into weekly_schedule (day_of_week, start_hour, end_hour) values 
-(3, 16, 20), -- Tuesday
-(4, 16, 20), -- Wednesday
-(5, 16, 20), -- Thursday
-(6, 16, 20), -- Friday
-(7, 16, 20); -- Saturday
+(3, 16, 20), (4, 16, 20), (5, 16, 20), (6, 16, 20), (7, 16, 20)
+on conflict do nothing;
 
--- 4. Calendar Overrides / Blocks
--- Specific dates where Ryan is totally unavailable or has custom hours
-create table schedule_overrides (
-  id uuid default uuid_generate_v4() primary key,
-  date date not null, -- Specific date (e.g., 2025-12-25)
-  is_blocked boolean default true, -- If true, no cuts that day
-  start_hour int, -- Optional: if not blocked, define custom hours
-  end_hour int
+-- 4. PROFILES (New!) - Stores user roles
+create table public.profiles (
+  id uuid references auth.users on delete cascade primary key,
+  email text,
+  is_admin boolean default false
 );
 
--- RLS Policies (Security)
+-- 5. Trigger to Auto-Create Profile on Signup
+-- This function runs automatically whenever a new user is created in Supabase Auth
+create or replace function public.handle_new_user() 
+returns trigger as $$
+begin
+  insert into public.profiles (id, email, is_admin)
+  values (new.id, new.email, false); -- Default to FALSE (not admin)
+  return new;
+end;
+$$ language plpgsql security definer;
+
+create trigger on_auth_user_created
+  after insert on auth.users
+  for each row execute procedure public.handle_new_user();
+
+-- RLS Policies (Updated)
 alter table bookings enable row level security;
 alter table barber_settings enable row level security;
 alter table weekly_schedule enable row level security;
-alter table schedule_overrides enable row level security;
+alter table profiles enable row level security;
 
--- Public Access (Client App)
+-- Public Access
 create policy "Public can insert bookings" on bookings for insert with check (true);
-create policy "Public can view own bookings" on bookings for select using (true); -- Simplify for now
+create policy "Public can view own bookings" on bookings for select using (true);
 create policy "Public can read settings" on barber_settings for select using (true);
 create policy "Public can read schedule" on weekly_schedule for select using (true);
-create policy "Public can read overrides" on schedule_overrides for select using (true);
 
--- Admin Access (Ryan) - Placeholder using 'authenticated' role
--- Ideally, you'd check email or specific user ID
-create policy "Admin full access bookings" on bookings for all using (auth.role() = 'authenticated');
-create policy "Admin full access settings" on barber_settings for all using (auth.role() = 'authenticated');
-create policy "Admin full access schedule" on weekly_schedule for all using (auth.role() = 'authenticated');
-create policy "Admin full access overrides" on schedule_overrides for all using (auth.role() = 'authenticated');
+-- Profiles Access
+create policy "Users can read own profile" on profiles for select using (auth.uid() = id);
 
--- Realtime
-alter publication supabase_realtime add table bookings;
-alter publication supabase_realtime add table barber_settings;
-alter publication supabase_realtime add table weekly_schedule;
-alter publication supabase_realtime add table schedule_overrides;
+-- ADMIN POLICIES (The "Ryan" Access)
+-- Check if the current user has is_admin = true in their profile
+create policy "Admins can do everything on bookings" on bookings for all 
+using (exists (select 1 from profiles where id = auth.uid() and is_admin = true));
+
+create policy "Admins can update settings" on barber_settings for update
+using (exists (select 1 from profiles where id = auth.uid() and is_admin = true));
+
+create policy "Admins can update schedule" on weekly_schedule for update
+using (exists (select 1 from profiles where id = auth.uid() and is_admin = true));

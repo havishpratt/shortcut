@@ -38,7 +38,7 @@ serve(async (req) => {
     const icsContent = [
       "BEGIN:VCALENDAR",
       "VERSION:2.0",
-      "PRODID:-//Bobby Cuts//App//EN",
+      "PRODID:-//Barber Cuts//App//EN",
       "BEGIN:VEVENT",
       `UID:${payload.record.id}`,
       `DTSTAMP:${new Date().toISOString().replace(/[-:]/g, "").split(".")[0]}Z`,

@@ -7,16 +7,16 @@ struct AppTheme {
     static let accentLight = Color(red: 0.55, green: 0.78, blue: 1.0)
     static let accentDark = Color(red: 0.25, green: 0.50, blue: 0.80)
     
-    // Background Colors - Clean and modern
-    static let backgroundPrimary = Color(red: 0.98, green: 0.98, blue: 1.0)
-    static let backgroundSecondary = Color(red: 0.94, green: 0.94, blue: 0.96)
-    static let backgroundCard = Color.white
-    static let backgroundElevated = Color(red: 0.96, green: 0.96, blue: 0.98)
+    // Background Colors - Dark theme
+    static let backgroundPrimary = Color(red: 0.08, green: 0.08, blue: 0.10)
+    static let backgroundSecondary = Color(red: 0.12, green: 0.12, blue: 0.14)
+    static let backgroundCard = Color(red: 0.14, green: 0.14, blue: 0.16)
+    static let backgroundElevated = Color(red: 0.18, green: 0.18, blue: 0.20)
     
     // Text Colors
-    static let textPrimary = Color(red: 0.15, green: 0.15, blue: 0.20)
-    static let textSecondary = Color(red: 0.45, green: 0.45, blue: 0.50)
-    static let textMuted = Color(red: 0.65, green: 0.65, blue: 0.70)
+    static let textPrimary = Color.white
+    static let textSecondary = Color(white: 0.65)
+    static let textMuted = Color(white: 0.45)
     
     // Accent Colors
     static let success = Color(red: 0.30, green: 0.75, blue: 0.45)
@@ -72,7 +72,7 @@ struct SecondaryButtonStyle: ButtonStyle {
             .foregroundColor(AppTheme.accent)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 16)
-            .background(AppTheme.accent.opacity(0.1))
+            .background(AppTheme.accent.opacity(0.15))
             .overlay(
                 RoundedRectangle(cornerRadius: 14)
                     .stroke(AppTheme.accent.opacity(0.3), lineWidth: 1)
@@ -92,7 +92,7 @@ struct CardModifier: ViewModifier {
             .padding(padding)
             .background(AppTheme.backgroundCard)
             .cornerRadius(16)
-            .shadow(color: Color.black.opacity(0.06), radius: 8, x: 0, y: 2)
+            .shadow(color: Color.black.opacity(0.2), radius: 8, x: 0, y: 2)
     }
 }
 

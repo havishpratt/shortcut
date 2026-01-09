@@ -12,7 +12,7 @@ struct ContactRyanButton: View {
                     .font(.system(size: 18))
                     .foregroundColor(.white)
                 
-                Text("Text Bobby")
+                Text("Contact Us")
                     .font(.headline)
                     .fontWeight(.semibold)
                     .foregroundColor(.white)
@@ -30,7 +30,7 @@ struct ContactRyanButton: View {
             .shadow(color: AppTheme.success.opacity(0.3), radius: 8, x: 0, y: 4)
         }
         .buttonStyle(PlainButtonStyle())
-        .confirmationDialog("Contact Bobby", isPresented: $showingOptions, titleVisibility: .visible) {
+        .confirmationDialog("Contact Us", isPresented: $showingOptions, titleVisibility: .visible) {
             Button("Call") {
                 if let url = URL(string: "tel://1234567890") {
                     UIApplication.shared.open(url)
@@ -43,7 +43,7 @@ struct ContactRyanButton: View {
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("How do you want to reach Bobby?")
+            Text("How would you like to reach us?")
         }
     }
 }
