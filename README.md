@@ -1,4 +1,4 @@
-# Bobby Cuts ✂️
+# Barber Cuts ✂️
 
 A mobile booking app for college students to schedule affordable haircuts. Built with SwiftUI and Supabase.
 
