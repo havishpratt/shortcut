@@ -13,7 +13,8 @@ struct Booking: Identifiable, Codable {
     let customerPhone: String
     let customerEmail: String
     var status: BookingStatus
-    
+    var createdAt: Date?
+
     // Mapping Swift names to Database columns (snake_case)
     enum CodingKeys: String, CodingKey {
         case id
@@ -22,6 +23,7 @@ struct Booking: Identifiable, Codable {
         case customerPhone = "customer_phone"
         case customerEmail = "customer_email"
         case status
+        case createdAt = "created_at"
     }
 }
 

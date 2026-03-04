@@ -8,6 +8,11 @@ struct ContentView: View {
         Group {
             if authViewModel.isOnboarding {
                 OnboardingView()
+            } else if authViewModel.isAdmin {
+                NavigationView {
+                    AdminDashboardView()
+                }
+                .navigationViewStyle(StackNavigationViewStyle())
             } else {
                 NavigationView {
                     HomeView()

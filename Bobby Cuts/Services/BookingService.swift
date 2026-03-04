@@ -1,15 +1,18 @@
 import Foundation
 import Supabase
+import Realtime
 
 // MARK: - API Models
 
-struct WeeklySchedule: Codable {
+struct WeeklySchedule: Codable, Identifiable {
+    var id: UUID?
     let dayOfWeek: Int
-    let startHour: Int
-    let endHour: Int
-    let isActive: Bool
+    var startHour: Int
+    var endHour: Int
+    var isActive: Bool
     
     enum CodingKeys: String, CodingKey {
+        case id
         case dayOfWeek = "day_of_week"
         case startHour = "start_hour"
         case endHour = "end_hour"
@@ -121,5 +124,102 @@ class BookingService {
             .value
         
         return bookings.map { $0.date }
+    }
+    
+    // MARK: - Admin: Bookings
+
+    func fetchAllBookings() async throws -> [Booking] {
+        let bookings: [Booking] = try await supabase
+            .from("bookings")
+            .select()
+            .order("date", ascending: false)
+            .execute()
+            .value
+        return bookings
+    }
+
+    func updateBookingStatus(id: UUID, status: BookingStatus) async throws {
+        struct StatusUpdate: Encodable {
+            let status: String
+        }
+        try await supabase
+            .from("bookings")
+            .update(StatusUpdate(status: status.rawValue))
+            .eq("id", value: id.uuidString)
+            .execute()
+    }
+
+    // MARK: - Admin: Schedule
+
+    func updateScheduleDay(dayOfWeek: Int, startHour: Int, endHour: Int, isActive: Bool) async throws {
+        struct ScheduleUpdate: Encodable {
+            let start_hour: Int
+            let end_hour: Int
+            let is_active: Bool
+        }
+        try await supabase
+            .from("weekly_schedule")
+            .update(ScheduleUpdate(start_hour: startHour, end_hour: endHour, is_active: isActive))
+            .eq("day_of_week", value: dayOfWeek)
+            .execute()
+    }
+
+    // MARK: - Admin: Settings
+
+    func updateSettings(maxCutsPerDay: Int, slotDurationMinutes: Int) async throws {
+        struct SettingsUpdate: Encodable {
+            let max_cuts_per_day: Int
+            let slot_duration_minutes: Int
+        }
+        try await supabase
+            .from("barber_settings")
+            .update(SettingsUpdate(max_cuts_per_day: maxCutsPerDay, slot_duration_minutes: slotDurationMinutes))
+            .eq("id", value: 1)
+            .execute()
+    }
+
+    // MARK: - Realtime
+    
+    private var realtimeChannel: RealtimeChannelV2?
+    private var realtimeTask: Task<Void, Never>?
+    
+    /// Listens for ANY change to the bookings table and triggers the callback
+    func subscribeToBookings(onChange: @escaping @Sendable () -> Void) async {
+        // If already subscribed, don't duplicate
+        if realtimeChannel != nil { return }
+        
+        let channel = supabase.realtimeV2.channel("bookings-changes") {
+            $0.broadcast.receiveOwnBroadcasts = true
+        }
+        realtimeChannel = channel
+        
+        // Set up postgres changes listener before subscribing
+        let changes = channel.postgresChange(AnyAction.self, schema: "public", table: "bookings")
+        
+        // Subscribe to the channel
+        do {
+            try await channel.subscribeWithError()
+            print("✅ Subscribed to Realtime Bookings")
+        } catch {
+            print("❌ Failed to subscribe to Realtime: \(error)")
+            return
+        }
+        
+        // Start listening for changes in a background task
+        realtimeTask = Task {
+            for await _ in changes {
+                print("⚡️ Realtime: Booking change detected")
+                await MainActor.run {
+                    onChange()
+                }
+            }
+        }
+    }
+    
+    func unsubscribe() async {
+        realtimeTask?.cancel()
+        realtimeTask = nil
+        await realtimeChannel?.unsubscribe()
+        realtimeChannel = nil
     }
 }

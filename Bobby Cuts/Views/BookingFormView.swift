@@ -18,7 +18,7 @@ struct BookingFormView: View {
     }
     
     var isFormValid: Bool {
-        !name.isEmpty && !phone.isEmpty && !email.isEmpty && email.contains("@")
+        !name.isEmpty && !phone.isEmpty && AuthViewModel.isValidEmail(email)
     }
     
     var formattedDate: String {

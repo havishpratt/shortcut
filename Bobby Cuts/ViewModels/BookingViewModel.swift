@@ -11,10 +11,11 @@ class BookingViewModel: ObservableObject {
     
     // Preloaded bookings: key is "yyyy-MM-dd", value is set of occupied hours
     @Published var allOccupiedSlots: [String: Set<Int>] = [:]
-    
-    // Default Schedule (Fallback until we load from DB)
-    let businessDays: Set<Int> = [1, 2, 3, 4, 5, 6, 7] // All Days
-    let businessHours = Array(16...19) // 4pm-8pm
+
+    // Schedule loaded from DB (with hardcoded fallbacks)
+    @Published var businessDays: Set<Int> = [1, 2, 3, 4, 5, 6, 7]
+    @Published var weeklySchedule: [WeeklySchedule] = []
+    @Published var maxCutsPerDay: Int = 10
     let bookingWindowDays = 14
     
     private let service = BookingService.shared
@@ -36,9 +37,51 @@ class BookingViewModel: ObservableObject {
     }()
     
     init() {
-        // Preload all bookings on init
         Task {
+            await loadSettingsFromDB()
+            await loadScheduleFromDB()
             await preloadAllBookings()
+            await subscribeToRealtimeUpdates()
+        }
+    }
+
+    // MARK: - Load Settings from DB
+
+    @MainActor
+    private func loadSettingsFromDB() async {
+        do {
+            let settings = try await service.fetchSettings()
+            maxCutsPerDay = settings.maxCutsPerDay
+        } catch {
+            print("⚠️ Failed to load settings from DB, using defaults: \(error)")
+        }
+    }
+
+    // MARK: - Load Schedule from DB
+
+    @MainActor
+    private func loadScheduleFromDB() async {
+        do {
+            let schedule = try await service.fetchWeeklySchedule()
+            let activeSchedule = schedule.filter { $0.isActive }
+            if !activeSchedule.isEmpty {
+                weeklySchedule = activeSchedule
+                businessDays = Set(activeSchedule.map { $0.dayOfWeek })
+            }
+        } catch {
+            print("⚠️ Failed to load schedule from DB, using defaults: \(error)")
+        }
+    }
+    
+    // MARK: - Realtime Subscription
+    
+    @MainActor
+    private func subscribeToRealtimeUpdates() async {
+        await service.subscribeToBookings { [weak self] in
+            // When any booking changes, reload all bookings
+            Task { @MainActor in
+                await self?.preloadAllBookings()
+            }
         }
     }
     
@@ -108,11 +151,26 @@ class BookingViewModel: ObservableObject {
         isLoadingSlots = false
     }
     
+    /// Returns the bookable hours for a given date based on the weekly schedule
+    private func businessHours(for date: Date) -> [Int] {
+        let weekday = shopCalendar.component(.weekday, from: date)
+        if let daySchedule = weeklySchedule.first(where: { $0.dayOfWeek == weekday }) {
+            return Array(daySchedule.startHour..<daySchedule.endHour)
+        }
+        // Fallback if schedule not loaded
+        return Array(16..<20)
+    }
+
     func getAvailableSlots(for date: Date) -> [TimeSlot] {
         let now = Date()
         let occupiedHours = getOccupiedHours(for: date)
-        
-        return businessHours.compactMap { hour in
+
+        // If day is already at max capacity, no slots available
+        if occupiedHours.count >= maxCutsPerDay {
+            return []
+        }
+
+        return businessHours(for: date).compactMap { hour in
             // 1. Check if this hour is already taken in the preloaded data
             if occupiedHours.contains(hour) {
                 return nil
